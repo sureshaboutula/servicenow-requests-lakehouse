@@ -33,14 +33,14 @@ targets:
     mode: development
     default: true
     workspace:
-      host: https://dbc-c6e0ef8c-5d8d.cloud.databricks.com
+      host: https://dbc-bf7042a0-9c61.cloud.databricks.com
     variables:
       env: dev
 
   prod:
     mode: production
     workspace:
-      host: https://dbc-c6e0ef8c-5d8d.cloud.databricks.com
+      host: https://dbc-bf7042a0-9c61.cloud.databricks.com
       root_path: /Workspace/Users/aboutula.suresh@gmail.com/.bundle/${bundle.name}/${bundle.target}
     variables:
       env: prod
