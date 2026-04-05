@@ -1,0 +1,96 @@
+# resources/medallion_pipeline.yml
+# =======================================================
+# Databricks Asset Bundle — Job Definition
+# Medallion Pipeline: Setup → Bronze → Silver → Gold
+# =======================================================
+
+resources:
+  jobs:
+    medallion_pipeline:
+      name: "servicenow-requests-medallion-${var.env}"
+      description: "Medallion pipeline for ServiceNow requests - ${var.env} environment"
+
+      # -------------------------------------------------------
+      # Email Notifications
+      # -------------------------------------------------------
+      email_notifications:
+        on_failure:
+          - aboutula.suresh@gmail.com
+        on_success:
+          - aboutula.suresh@gmail.com
+
+      # -------------------------------------------------------
+      # Job Parameters — passed to all tasks as widgets
+      # -------------------------------------------------------
+      parameters:
+        - name: env
+          default: ${var.env}
+        - name: schema_bronze
+          default: ${var.schema_bronze}
+        - name: schema_silver
+          default: ${var.schema_silver}
+        - name: schema_gold
+          default: ${var.schema_gold}
+
+      # -------------------------------------------------------
+      # Serverless Environment
+      # -------------------------------------------------------
+      environments:
+        - environment_key: serverless_env
+          spec:
+            client: "1"
+
+      # -------------------------------------------------------
+      # Tasks
+      # -------------------------------------------------------
+      tasks:
+
+        # Task 1 — Setup: Create Catalog and Schemas
+        - task_key: setup
+          description: "Create catalog and schemas for ${var.env} environment"
+          environment_key: serverless_env
+          notebook_task:
+            notebook_path: ../src/setup/setup.py
+            base_parameters:
+              env: ${var.env}
+              schema_bronze: ${var.schema_bronze}
+              schema_silver: ${var.schema_silver}
+              schema_gold: ${var.schema_gold}
+
+        # Task 2 — Bronze: Auto Loader Ingestion
+        - task_key: bronze_autoloader
+          description: "Ingest raw parquet files from S3 into Bronze Delta table"
+          depends_on:
+            - task_key: setup
+          environment_key: serverless_env
+          notebook_task:
+            notebook_path: ../src/bronze/autoloader_ingestion.py
+            base_parameters:
+              env: ${var.env}
+              schema_bronze: ${var.schema_bronze}
+
+        # Task 3 — Silver: Cleaning + SCD Type 2
+        - task_key: silver_transform
+          description: "Clean data and apply SCD Type 2 for status tracking"
+          depends_on:
+            - task_key: bronze_autoloader
+          environment_key: serverless_env
+          notebook_task:
+            notebook_path: ../src/silver/cleaning.py
+            base_parameters:
+              env: ${var.env}
+              schema_bronze: ${var.schema_bronze}
+              schema_silver: ${var.schema_silver}
+
+        # Task 4 — Gold: Aggregations
+        - task_key: gold_aggregations
+          description: "Create aggregated business ready tables in Gold layer"
+          depends_on:
+            - task_key: silver_transform
+          environment_key: serverless_env
+          notebook_task:
+            notebook_path: ../src/gold/aggregations.py
+            base_parameters:
+              env: ${var.env}
+              schema_silver: ${var.schema_silver}
+              schema_gold: ${var.schema_gold}
