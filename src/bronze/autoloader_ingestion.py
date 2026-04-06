@@ -71,6 +71,8 @@ df_bronze = (
         .format("cloudFiles")
         .option("cloudFiles.format", "parquet")
         .option("recursiveFileLookup", "true")
+        .option("mergeSchema", "true")
+        .option("cloudFiles.schemaEvolutionMode", "rescue")
         .schema(bronze_schema)
         .load(raw_path)
 )
