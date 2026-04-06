@@ -75,7 +75,6 @@ df_bronze = (
 # -------------------------------------------------------
 from pyspark.sql.functions import (
     current_timestamp,
-    input_file_name,
     lit,
     to_timestamp,
     col
@@ -91,7 +90,7 @@ df_bronze = (
             to_timestamp(col("last_updated_at").cast("string"), "yyyy-MM-dd HH:mm:ss"))
         # Metadata columns
         .withColumn("_ingested_at",   current_timestamp())
-        .withColumn("_source_file",   input_file_name())
+        .withColumn("_source_file",   col("_metadata.file_path"))
         .withColumn("_env",           lit(env))
 )
 
