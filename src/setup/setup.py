@@ -1,7 +1,7 @@
 # Databricks notebook source
 # src/setup/setup.py
 # =======================================================
-# Setup Script — Creates Catalog and Schemas
+# Setup Script — Creates Catalog, Schemas and External Locations
 # Runs as first task in Databricks Workflow
 # All variables passed via DAB → Databricks Widgets
 # =======================================================
@@ -17,19 +17,22 @@ schema_gold   = dbutils.widgets.get("schema_gold")
 # -------------------------------------------------------
 # Derived values
 # -------------------------------------------------------
-catalog = f"servicenow_requests_{env}"
-schemas = [schema_bronze, schema_silver, schema_gold]
+catalog            = f"servicenow_requests_{env}"
+schemas            = [schema_bronze, schema_silver, schema_gold]
+storage_credential = "s3-dynamodb-exports-credential"
+checkpoint_path    = f"s3://dynamodb-project-exports/checkpoints/{env}/"
 
 print(f"""
 === Setup Configuration ===
-Environment : {env}
-Catalog     : {catalog}
-Schemas     : {schemas}
+Environment     : {env}
+Catalog         : {catalog}
+Schemas         : {schemas}
+Checkpoint Path : {checkpoint_path}
 ===========================
 """)
 
 # -------------------------------------------------------
-# Create Catalog
+# Step 1 — Create Catalog
 # -------------------------------------------------------
 def create_catalog(catalog):
     spark.sql(f"""
@@ -41,7 +44,7 @@ def create_catalog(catalog):
 create_catalog(catalog)
 
 # -------------------------------------------------------
-# Create Schemas
+# Step 2 — Create Schemas
 # -------------------------------------------------------
 def create_schema(catalog, schema_name):
     spark.sql(f"USE CATALOG {catalog}")
@@ -55,11 +58,29 @@ for schema in schemas:
     create_schema(catalog, schema)
 
 # -------------------------------------------------------
-# Verify
+# Step 3 — Create Checkpoint External Location
 # -------------------------------------------------------
-print(f"\nVerifying setup for catalog '{catalog}':")
+print(f"\nStep 3: Creating checkpoint external location...")
+
+spark.sql(f"""
+    CREATE EXTERNAL LOCATION IF NOT EXISTS `el-checkpoint-{env}`
+    URL '{checkpoint_path}'
+    WITH (STORAGE CREDENTIAL `{storage_credential}`)
+    COMMENT 'Auto Loader checkpoint location - {env} environment'
+""")
+print(f"✅ External location 'el-checkpoint-{env}' ready")
+
+# -------------------------------------------------------
+# Step 4 — Verify
+# -------------------------------------------------------
+print(f"\nStep 4: Verifying setup...")
+
+print(f"\nSchemas in '{catalog}':")
 result = spark.sql(f"SHOW SCHEMAS IN {catalog}").collect()
 for row in result:
     print(f"   └── {catalog}.{row['databaseName']}")
+
+print(f"\nExternal Locations:")
+display(spark.sql("SHOW EXTERNAL LOCATIONS"))
 
 print("\n✅ Setup complete!")
