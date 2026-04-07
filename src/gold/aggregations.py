@@ -43,7 +43,7 @@ from pyspark.sql.functions import (
     col, count, countDistinct,
     current_timestamp, lit,
     round, avg, max, min,
-    date_trunc, datediff
+    date_trunc, datediff, when
 )
 
 # -------------------------------------------------------
