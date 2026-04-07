@@ -60,7 +60,7 @@ df_silver = (
 print(f"✅ Current Silver records: {df_silver.count()}")
 
 # Cache for multiple aggregations
-df_silver.cache()
+#df_silver.cache()
 
 # -------------------------------------------------------
 # Step 2 — Requests by Status
