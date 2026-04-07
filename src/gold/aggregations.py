@@ -175,7 +175,7 @@ display(df_owner_workload)
 # -------------------------------------------------------
 # Step 6 — Unpersist Cache
 # -------------------------------------------------------
-df_silver.unpersist()
+#df_silver.unpersist()
 
 # -------------------------------------------------------
 # Step 7 — Final Summary
