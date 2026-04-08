@@ -70,14 +70,6 @@ spark.sql(f"""
 """)
 print(f"✅ External location 'el-checkpoint-{env}' ready")
 
-spark.sql(f"""
-    CREATE EXTERNAL LOCATION IF NOT EXISTS `el-schema-{env}`
-    URL 's3://dynamodb-project-exports/checkpoints/{env}/bronze_schema/'
-    WITH (STORAGE CREDENTIAL `s3-dynamodb-exports-credential`)
-    COMMENT 'Auto Loader schema location - {env} environment'
-""")
-print(f"✅ Schema external location 'el-schema-{env}' ready")
-
 # -------------------------------------------------------
 # Step 4 — Verify
 # -------------------------------------------------------
