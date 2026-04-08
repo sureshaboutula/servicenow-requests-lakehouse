@@ -38,14 +38,24 @@ Checkpoint    : {checkpoint_path}
 # -------------------------------------------------------
 # Imports
 # -------------------------------------------------------
-from pyspark.sql.functions import (
-    current_timestamp, lit,
-    to_timestamp, col,
-    coalesce
-)
+from pyspark.sql.types import StructType, StructField, StringType
+from pyspark.sql.functions import col, to_timestamp, current_timestamp, lit
 
+bronze_schema = StructType([
+    StructField("request_id",         StringType(), True),
+    StructField("orderType",          StringType(), True),
+    StructField("requested_by_name",  StringType(), True),
+    StructField("request_created_at", StringType(), True),
+    StructField("current_status",     StringType(), True),
+    StructField("last_updated_at",    StringType(), True),  # Always string from Glue
+    StructField("latest_comment",     StringType(), True),
+    StructField("owner_name",         StringType(), True),
+    StructField("owner_email",        StringType(), True),
+    StructField("location",           StringType(), True),
+    StructField("department",         StringType(), True),
+])
 # -------------------------------------------------------
-# Auto Loader — Read Stream WITHOUT schema enforcement
+# Auto Loader — Read
 # -------------------------------------------------------
 print("Starting Auto Loader stream from S3...")
 
@@ -54,11 +64,8 @@ df_bronze = (
         .format("cloudFiles")
         .option("cloudFiles.format", "parquet")
         .option("recursiveFileLookup", "true")
-        .option("mergeSchema", "true")
-        .option("cloudFiles.schemaEvolutionMode", "rescue")
         .option("cloudFiles.schemaLocation", schema_path)
-        .option("cloudFiles.schemaHints",
-            "last_updated_at STRING, request_created_at STRING")
+        .schema(bronze_schema)
         .load(raw_path)
 )
 
@@ -67,19 +74,10 @@ df_bronze = (
 # -------------------------------------------------------
 df_bronze = (
     df_bronze
-        # Cast request_created_at to timestamp
         .withColumn("request_created_at",
             to_timestamp(col("request_created_at"), "yyyy-MM-dd HH:mm:ss"))
-
-        # Handle last_updated_at — coalesce both INT96 and BYTE_ARRAY
         .withColumn("last_updated_at",
-            coalesce(
-                to_timestamp(col("last_updated_at").cast("string"), "yyyy-MM-dd HH:mm:ss"),
-                col("last_updated_at").cast("timestamp")
-            )
-        )
-
-        # Select only known columns — exclude _rescued_data
+            to_timestamp(col("last_updated_at"), "yyyy-MM-dd HH:mm:ss"))
         .select(
             col("request_id"),
             col("orderType"),
