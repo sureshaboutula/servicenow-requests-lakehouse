@@ -3,7 +3,7 @@
 # =======================================================
 # Gold Layer — Aggregations and Business Ready Tables
 # Reads from Silver Delta table (current records only)
-# Creates aggregated tables for reporting
+# Writes to Gold Delta tables as External Tables on S3
 # =======================================================
 
 # -------------------------------------------------------
@@ -23,11 +23,19 @@ gold_by_department    = f"{catalog}.{schema_gold}.requests_by_department"
 gold_by_location      = f"{catalog}.{schema_gold}.requests_by_location"
 gold_owner_workload   = f"{catalog}.{schema_gold}.owner_workload"
 
+# S3 External Paths
+gold_base_path        = "s3://dynamodb-project-exports/db-gold/"
+gold_status_path      = f"{gold_base_path}requests_by_status/"
+gold_dept_path        = f"{gold_base_path}requests_by_department/"
+gold_location_path    = f"{gold_base_path}requests_by_location/"
+gold_workload_path    = f"{gold_base_path}owner_workload/"
+
 print(f"""
 === Gold Layer Configuration ===
 Environment   : {env}
 Catalog       : {catalog}
 Silver Table  : {silver_table}
+Gold S3 Base  : {gold_base_path}
 Gold Tables:
   - {gold_by_status}
   - {gold_by_department}
@@ -41,9 +49,7 @@ Gold Tables:
 # -------------------------------------------------------
 from pyspark.sql.functions import (
     col, count, countDistinct,
-    current_timestamp, lit,
-    round, avg, max, min,
-    date_trunc, datediff, when
+    current_timestamp, when
 )
 
 # -------------------------------------------------------
@@ -59,8 +65,18 @@ df_silver = (
 
 print(f"✅ Current Silver records: {df_silver.count()}")
 
-# Cache for multiple aggregations
-#df_silver.cache()
+# -------------------------------------------------------
+# Helper function to write gold table
+# -------------------------------------------------------
+def write_gold_table(df, table_name, s3_path):
+    (
+        df.write
+            .format("delta")
+            .mode("overwrite")
+            .option("path", s3_path)              # ← External S3 location
+            .saveAsTable(table_name)
+    )
+    print(f"✅ {table_name} → {s3_path}")
 
 # -------------------------------------------------------
 # Step 2 — Requests by Status
@@ -79,13 +95,7 @@ df_by_status = (
         .orderBy("total_requests", ascending=False)
 )
 
-(
-    df_by_status.write
-        .format("delta")
-        .mode("overwrite")
-        .saveAsTable(gold_by_status)
-)
-print(f"✅ {gold_by_status} created")
+write_gold_table(df_by_status, gold_by_status, gold_status_path)
 display(df_by_status)
 
 # -------------------------------------------------------
@@ -104,13 +114,7 @@ df_by_department = (
         .orderBy("department", "total_requests", ascending=False)
 )
 
-(
-    df_by_department.write
-        .format("delta")
-        .mode("overwrite")
-        .saveAsTable(gold_by_department)
-)
-print(f"✅ {gold_by_department} created")
+write_gold_table(df_by_department, gold_by_department, gold_dept_path)
 display(df_by_department)
 
 # -------------------------------------------------------
@@ -130,13 +134,7 @@ df_by_location = (
         .orderBy("location", "total_requests", ascending=False)
 )
 
-(
-    df_by_location.write
-        .format("delta")
-        .mode("overwrite")
-        .saveAsTable(gold_by_location)
-)
-print(f"✅ {gold_by_location} created")
+write_gold_table(df_by_location, gold_by_location, gold_location_path)
 display(df_by_location)
 
 # -------------------------------------------------------
@@ -149,36 +147,19 @@ df_owner_workload = (
         .groupBy("owner_name", "owner_email", "department")
         .agg(
             count("request_id").alias("total_requests"),
-            count(
-                when(col("current_status") == "PENDING", 1)
-            ).alias("pending_requests"),
-            count(
-                when(col("current_status") == "COMPLETED", 1)
-            ).alias("completed_requests"),
-            count(
-                when(col("current_status") == "FAILED", 1)
-            ).alias("failed_requests"),
+            count(when(col("current_status") == "PENDING", 1)).alias("pending_requests"),
+            count(when(col("current_status") == "COMPLETED", 1)).alias("completed_requests"),
+            count(when(col("current_status") == "FAILED", 1)).alias("failed_requests"),
             current_timestamp().alias("_updated_at")
         )
         .orderBy("total_requests", ascending=False)
 )
 
-(
-    df_owner_workload.write
-        .format("delta")
-        .mode("overwrite")
-        .saveAsTable(gold_owner_workload)
-)
-print(f"✅ {gold_owner_workload} created")
+write_gold_table(df_owner_workload, gold_owner_workload, gold_workload_path)
 display(df_owner_workload)
 
 # -------------------------------------------------------
-# Step 6 — Unpersist Cache
-# -------------------------------------------------------
-#df_silver.unpersist()
-
-# -------------------------------------------------------
-# Step 7 — Final Summary
+# Step 6 — Final Summary
 # -------------------------------------------------------
 print(f"""
 ╔══════════════════════════════════════════════════════╗
@@ -189,6 +170,6 @@ print(f"""
 ║  ✅ requests_by_location                             ║
 ║  ✅ owner_workload                                   ║
 ╠══════════════════════════════════════════════════════╣
-║  All tables in: {catalog}.{schema_gold:<28}  ║
+║  S3 Base : {gold_base_path:<41} ║
 ╚══════════════════════════════════════════════════════╝
 """)
