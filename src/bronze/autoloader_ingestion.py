@@ -57,6 +57,8 @@ df_bronze = (
         .option("mergeSchema", "true")
         .option("cloudFiles.schemaEvolutionMode", "rescue")
         .option("cloudFiles.schemaLocation", schema_path)
+        .option("cloudFiles.schemaHints",
+            "last_updated_at STRING, request_created_at STRING")
         .load(raw_path)
 )
 
