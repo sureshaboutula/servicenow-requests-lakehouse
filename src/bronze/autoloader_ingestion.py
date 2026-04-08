@@ -22,6 +22,7 @@ bronze_table = f"{catalog}.{schema_bronze}.raw_requests"
 raw_path        = "s3://dynamodb-project-exports/processed_requests/"
 checkpoint_path = f"s3://dynamodb-project-exports/checkpoints/{env}/bronze/"
 bronze_path     = "s3://dynamodb-project-exports/db-bronze/raw_requests/"
+schema_path     = f"s3://dynamodb-project-exports/checkpoints/{env}/bronze_schema/"
 
 print(f"""
 === Bronze Layer Configuration ===
@@ -55,6 +56,7 @@ df_bronze = (
         .option("recursiveFileLookup", "true")
         .option("mergeSchema", "true")
         .option("cloudFiles.schemaEvolutionMode", "rescue")
+        .option("cloudFiles.schemaLocation", schema_path)
         .load(raw_path)
 )
 
