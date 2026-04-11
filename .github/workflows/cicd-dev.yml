@@ -1,0 +1,76 @@
+name: CI/CD Dev
+
+on:
+  push:
+    branches:
+      - dev
+
+jobs:
+  # -------------------------------------------------------
+  # Action 1 — Bundle Validate
+  # -------------------------------------------------------
+  validate:
+    name: "Action 1 — Bundle Validate"
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Install Databricks CLI
+        uses: databricks/setup-cli@main
+
+      - name: Bundle Validate - Dev
+        env:
+          DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+          DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+        run: |
+          databricks bundle validate --target dev
+
+  # -------------------------------------------------------
+  # Action 2 — Bundle Deploy
+  # Starts only if Action 1 passes
+  # Waits for deploy to complete
+  # -------------------------------------------------------
+  deploy:
+    name: "Action 2 — Bundle Deploy"
+    runs-on: ubuntu-latest
+    needs: validate          # starts only if validate passes
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Install Databricks CLI
+        uses: databricks/setup-cli@main
+
+      - name: Bundle Deploy - Dev
+        env:
+          DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+          DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+        run: |
+          databricks bundle deploy --target dev
+
+  # -------------------------------------------------------
+  # Action 3 — Pipeline Run
+  # Starts only if Action 2 passes
+  # Triggers run and exits immediately (no-wait)
+  # -------------------------------------------------------
+  run_pipeline:
+    name: "Action 3 — Pipeline Run"
+    runs-on: ubuntu-latest
+    needs: deploy            # starts only if deploy passes
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Install Databricks CLI
+        uses: databricks/setup-cli@main
+
+      - name: Run Pipeline - Dev (no-wait)
+        env:
+          DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+          DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+        run: |
+          databricks bundle run medallion_pipeline --target dev --no-wait
