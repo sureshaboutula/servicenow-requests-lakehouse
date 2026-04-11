@@ -1,0 +1,76 @@
+name: CI/CD Prod
+
+on:
+  push:
+    branches:
+      - main        # Triggers only when code is merged to main
+
+jobs:
+  # -------------------------------------------------------
+  # Action 1 — Bundle Validate
+  # -------------------------------------------------------
+  validate:
+    name: "Action 1 — Bundle Validate Prod"
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Install Databricks CLI
+        uses: databricks/setup-cli@main
+
+      - name: Bundle Validate - Prod
+        env:
+          DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+          DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+        run: |
+          databricks bundle validate --target prod
+
+  # -------------------------------------------------------
+  # Action 2 — Bundle Deploy
+  # Starts only if Action 1 passes
+  # Waits for deploy to complete
+  # -------------------------------------------------------
+  deploy:
+    name: "Action 2 — Bundle Deploy Prod"
+    runs-on: ubuntu-latest
+    needs: validate
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Install Databricks CLI
+        uses: databricks/setup-cli@main
+
+      - name: Bundle Deploy - Prod
+        env:
+          DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+          DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+        run: |
+          databricks bundle deploy --target prod
+
+  # -------------------------------------------------------
+  # Action 3 — Pipeline Run
+  # Starts only if Action 2 passes
+  # Triggers run and exits immediately (no-wait)
+  # -------------------------------------------------------
+  run_pipeline:
+    name: "Action 3 — Pipeline Run Prod"
+    runs-on: ubuntu-latest
+    needs: deploy
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Install Databricks CLI
+        uses: databricks/setup-cli@main
+
+      - name: Run Pipeline - Prod (no-wait)
+        env:
+          DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+          DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+        run: |
+          databricks bundle run medallion_pipeline --target prod --no-wait
