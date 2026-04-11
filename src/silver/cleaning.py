@@ -79,8 +79,28 @@ print(f"✅ Records after cleaning: {df_cleaned.count()}")
 # -------------------------------------------------------
 print("\nStep 3: Applying SCD Type 2...")
 
-df_scd = (
+from delta.tables import DeltaTable
+from pyspark.sql.functions import col, lit, current_timestamp, row_number
+from pyspark.sql.window import Window
+
+# -------------------------------------------------------
+# Get LATEST record per request_id from Bronze
+# This avoids comparing against old bronze records
+# -------------------------------------------------------
+window_spec = Window.partitionBy("request_id").orderBy(col("last_updated_at").desc())
+
+df_latest_bronze = (
     df_cleaned
+        .withColumn("row_num", row_number().over(window_spec))
+        .filter(col("row_num") == 1)
+        .drop("row_num")
+)
+
+print(f"Latest bronze records: {df_latest_bronze.count()}")
+
+# Add SCD Type 2 columns
+df_scd = (
+    df_latest_bronze
         .withColumn("effective_start_date", col("last_updated_at"))
         .withColumn("effective_end_date",   lit(None).cast("timestamp"))
         .withColumn("is_current",           lit(True))
@@ -94,7 +114,7 @@ if not table_exists:
         df_scd.write
             .format("delta")
             .mode("overwrite")
-            .option("path", silver_path)          # ← External S3 location
+            .option("path", silver_path)
             .saveAsTable(silver_table)
     )
     print(f"✅ Silver table created with {df_scd.count()} records")
@@ -103,37 +123,41 @@ else:
     print(f"Silver table found. Applying SCD Type 2 merge...")
     delta_table = DeltaTable.forName(spark, silver_table)
 
-    # Expire changed records
-    delta_table.update(
-        condition = f"""
-            is_current = true
-            AND EXISTS (
-                SELECT 1 FROM {bronze_table} src
-                WHERE src.request_id = {silver_table}.request_id
-                AND src.current_status != {silver_table}.current_status
-            )
-        """,
+    # -------------------------------------------------------
+    # Step 3a — Expire ONLY records where status changed
+    # Compare silver current records against LATEST bronze
+    # -------------------------------------------------------
+    delta_table.alias("silver").merge(
+        df_scd.alias("latest"),
+        "silver.request_id = latest.request_id AND silver.is_current = true"
+    ).whenMatchedUpdate(
+        condition = "silver.current_status != latest.current_status",
         set = {
             "is_current"        : "false",
             "effective_end_date": "current_timestamp()"
         }
-    )
+    ).execute()
 
-    # Insert new/changed records
+    print(f"✅ Expired changed records")
+
+    # -------------------------------------------------------
+    # Step 3b — Insert new records and changed records
+    # Only insert if not already current with same status
+    # -------------------------------------------------------
     (
         delta_table.alias("silver")
             .merge(
-                df_scd.alias("bronze"),
+                df_scd.alias("new"),
                 """
-                silver.request_id = bronze.request_id
-                AND silver.current_status = bronze.current_status
+                silver.request_id = new.request_id
+                AND silver.current_status = new.current_status
                 AND silver.is_current = true
                 """
             )
             .whenNotMatchedInsertAll()
             .execute()
     )
-    print(f"✅ SCD Type 2 merge complete")
+    print(f"✅ Inserted new/changed records")
 
 # -------------------------------------------------------
 # Step 4 — Verify
