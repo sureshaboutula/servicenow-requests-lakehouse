@@ -71,9 +71,48 @@ spark.sql(f"""
 print(f"✅ External location 'el-checkpoint-{env}' ready")
 
 # -------------------------------------------------------
-# Step 4 — Verify
+# Step 4 — Create Bronze External Location
 # -------------------------------------------------------
-print(f"\nStep 4: Verifying setup...")
+print(f"\nStep 4: Creating bronze external location...")
+
+spark.sql(f"""
+    CREATE EXTERNAL LOCATION IF NOT EXISTS `el-bronze-{env}`
+    URL 's3://dynamodb-project-exports/db-bronze/{env}/'
+    WITH (STORAGE CREDENTIAL `s3-dynamodb-exports-credential`)
+    COMMENT 'Bronze layer external location - {env} environment'
+""")
+print(f"✅ External location 'el-bronze-{env}' ready")
+
+# -------------------------------------------------------
+# Step 5 — Create Silver External Location
+# -------------------------------------------------------
+print(f"\nStep 5: Creating silver external location...")
+
+spark.sql(f"""
+    CREATE EXTERNAL LOCATION IF NOT EXISTS `el-silver-{env}`
+    URL 's3://dynamodb-project-exports/db-silver/{env}/'
+    WITH (STORAGE CREDENTIAL `s3-dynamodb-exports-credential`)
+    COMMENT 'Silver layer external location - {env} environment'
+""")
+print(f"✅ External location 'el-silver-{env}' ready")
+
+# -------------------------------------------------------
+# Step 6 — Create Gold External Location
+# -------------------------------------------------------
+print(f"\nStep 6: Creating gold external location...")
+
+spark.sql(f"""
+    CREATE EXTERNAL LOCATION IF NOT EXISTS `el-gold-{env}`
+    URL 's3://dynamodb-project-exports/db-gold/{env}/'
+    WITH (STORAGE CREDENTIAL `s3-dynamodb-exports-credential`)
+    COMMENT 'Gold layer external location - {env} environment'
+""")
+print(f"✅ External location 'el-gold-{env}' ready")
+
+# -------------------------------------------------------
+# Step 7 — Verify
+# -------------------------------------------------------
+print(f"\nStep 7: Verifying setup...")
 
 print(f"\nSchemas in '{catalog}':")
 result = spark.sql(f"SHOW SCHEMAS IN {catalog}").collect()
