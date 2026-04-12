@@ -22,11 +22,21 @@ schemas            = [schema_bronze, schema_silver, schema_gold]
 storage_credential = "s3-dynamodb-exports-credential"
 checkpoint_path    = f"s3://dynamodb-project-exports/checkpoints/{env}/"
 
+# S3 paths — env specific
+raw_path        = "s3://dynamodb-project-exports/processed_requests/"
+bronze_path     = f"s3://dynamodb-project-exports/db-bronze/{env}/"
+silver_path     = f"s3://dynamodb-project-exports/db-silver/{env}/"
+gold_path       = f"s3://dynamodb-project-exports/db-gold/{env}/"
+checkpoint_path = f"s3://dynamodb-project-exports/checkpoints/{env}/"
+
 print(f"""
 === Setup Configuration ===
 Environment     : {env}
 Catalog         : {catalog}
 Schemas         : {schemas}
+Bronze Path     : {bronze_path}
+Silver Path     : {silver_path}
+Gold Path       : {gold_path}
 Checkpoint Path : {checkpoint_path}
 ===========================
 """)
@@ -58,61 +68,37 @@ for schema in schemas:
     create_schema(catalog, schema)
 
 # -------------------------------------------------------
-# Step 3 — Create Checkpoint External Location
+# Step 3 — Create External Locations (env specific)
 # -------------------------------------------------------
-print(f"\nStep 3: Creating checkpoint external location...")
+print(f"\nStep 3: Creating external locations for {env}...")
 
-spark.sql(f"""
-    CREATE EXTERNAL LOCATION IF NOT EXISTS `el-checkpoint-{env}`
-    URL '{checkpoint_path}'
-    WITH (STORAGE CREDENTIAL `{storage_credential}`)
-    COMMENT 'Auto Loader checkpoint location - {env} environment'
-""")
-print(f"✅ External location 'el-checkpoint-{env}' ready")
+external_locations = {
+    f"el-raw"              : raw_path,        # shared — same for dev and prod
+    f"el-bronze-{env}"     : bronze_path,
+    f"el-silver-{env}"     : silver_path,
+    f"el-gold-{env}"       : gold_path,
+    f"el-checkpoint-{env}" : checkpoint_path,
+}
 
-# -------------------------------------------------------
-# Step 4 — Create Bronze External Location
-# -------------------------------------------------------
-print(f"\nStep 4: Creating bronze external location...")
-
-spark.sql(f"""
-    CREATE EXTERNAL LOCATION IF NOT EXISTS `el-bronze-{env}`
-    URL 's3://dynamodb-project-exports/db-bronze/{env}/'
-    WITH (STORAGE CREDENTIAL `s3-dynamodb-exports-credential`)
-    COMMENT 'Bronze layer external location - {env} environment'
-""")
-print(f"✅ External location 'el-bronze-{env}' ready")
-
-# -------------------------------------------------------
-# Step 5 — Create Silver External Location
-# -------------------------------------------------------
-print(f"\nStep 5: Creating silver external location...")
-
-spark.sql(f"""
-    CREATE EXTERNAL LOCATION IF NOT EXISTS `el-silver-{env}`
-    URL 's3://dynamodb-project-exports/db-silver/{env}/'
-    WITH (STORAGE CREDENTIAL `s3-dynamodb-exports-credential`)
-    COMMENT 'Silver layer external location - {env} environment'
-""")
-print(f"✅ External location 'el-silver-{env}' ready")
+for location_name, location_path in external_locations.items():
+    try:
+        spark.sql(f"""
+            CREATE EXTERNAL LOCATION IF NOT EXISTS `{location_name}`
+            URL '{location_path}'
+            WITH (STORAGE CREDENTIAL `{storage_credential}`)
+            COMMENT '{location_name} - {env} environment'
+        """)
+        print(f"✅ External location '{location_name}' → {location_path}")
+    except Exception as e:
+        if "LOCATION_OVERLAP" in str(e) or "already exists" in str(e).lower():
+            print(f"⚠️  '{location_name}' already exists — skipping")
+        else:
+            print(f"❌ Failed '{location_name}': {str(e)[:200]}")
 
 # -------------------------------------------------------
-# Step 6 — Create Gold External Location
+# Step 4 — Verify
 # -------------------------------------------------------
-print(f"\nStep 6: Creating gold external location...")
-
-spark.sql(f"""
-    CREATE EXTERNAL LOCATION IF NOT EXISTS `el-gold-{env}`
-    URL 's3://dynamodb-project-exports/db-gold/{env}/'
-    WITH (STORAGE CREDENTIAL `s3-dynamodb-exports-credential`)
-    COMMENT 'Gold layer external location - {env} environment'
-""")
-print(f"✅ External location 'el-gold-{env}' ready")
-
-# -------------------------------------------------------
-# Step 7 — Verify
-# -------------------------------------------------------
-print(f"\nStep 7: Verifying setup...")
+print(f"\nStep 4: Verifying setup...")
 
 print(f"\nSchemas in '{catalog}':")
 result = spark.sql(f"SHOW SCHEMAS IN {catalog}").collect()
