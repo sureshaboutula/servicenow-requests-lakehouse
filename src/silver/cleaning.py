@@ -19,7 +19,7 @@ schema_silver = dbutils.widgets.get("schema_silver")
 catalog       = f"servicenow_requests_{env}"
 bronze_table  = f"{catalog}.{schema_bronze}.raw_requests"
 silver_table  = f"{catalog}.{schema_silver}.requests_scd"
-silver_path   = "s3://dynamodb-project-exports/db-silver/requests_scd/"
+silver_path   = f"s3://dynamodb-project-exports/db-silver/{env}/requests_scd/"
 
 print(f"""
 === Silver Layer Configuration ===

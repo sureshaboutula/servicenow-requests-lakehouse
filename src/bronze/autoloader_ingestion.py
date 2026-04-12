@@ -20,8 +20,8 @@ bronze_table = f"{catalog}.{schema_bronze}.raw_requests"
 
 # S3 Paths
 raw_path        = "s3://dynamodb-project-exports/processed_requests/"
+bronze_path     = f"s3://dynamodb-project-exports/db-bronze/{env}/raw_requests/"
 checkpoint_path = f"s3://dynamodb-project-exports/checkpoints/{env}/bronze/"
-bronze_path     = "s3://dynamodb-project-exports/db-bronze/raw_requests/"
 schema_path     = f"s3://dynamodb-project-exports/checkpoints/{env}/bronze_schema/"
 
 print(f"""
@@ -107,7 +107,7 @@ print(f"External S3 location: {bronze_path}")
         .format("delta")
         .outputMode("append")
         .option("checkpointLocation", checkpoint_path)
-        .option("path", bronze_path)              # ← External S3 location
+        .option("path", bronze_path)  
         .option("mergeSchema", "true")
         .trigger(availableNow=True)
         .toTable(bronze_table)
