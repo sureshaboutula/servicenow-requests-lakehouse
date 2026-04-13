@@ -24,11 +24,11 @@ gold_by_location      = f"{catalog}.{schema_gold}.requests_by_location"
 gold_owner_workload   = f"{catalog}.{schema_gold}.owner_workload"
 
 # S3 External Paths
-gold_base_path        = "s3://dynamodb-project-exports/db-gold/"
-gold_status_path      = f"{gold_base_path}requests_by_status/"
-gold_dept_path        = f"{gold_base_path}requests_by_department/"
-gold_location_path    = f"{gold_base_path}requests_by_location/"
-gold_workload_path    = f"{gold_base_path}owner_workload/"
+gold_base_path     = f"s3://dynamodb-project-exports/db-gold/{env}/"
+gold_status_path   = f"{gold_base_path}requests_by_status/"
+gold_dept_path     = f"{gold_base_path}requests_by_department/"
+gold_location_path = f"{gold_base_path}requests_by_location/"
+gold_workload_path = f"{gold_base_path}owner_workload/"
 
 print(f"""
 === Gold Layer Configuration ===
