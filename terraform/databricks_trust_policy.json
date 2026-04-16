@@ -1,0 +1,26 @@
+{
+    "Version": "2012-10-17",
+    "Statement": [
+      {
+        "Sid": "DatabricksAssume",
+        "Effect": "Allow",
+        "Principal": {
+          "AWS": "arn:aws:iam::414351767826:root"
+        },
+        "Action": "sts:AssumeRole",
+        "Condition": {
+          "StringEquals": {
+            "sts:ExternalId": "6555e35c-1b70-48f0-abd0-ef2bb37bfcb1"
+          }
+        }
+      },
+      {
+        "Sid": "SelfAssume",
+        "Effect": "Allow",
+        "Principal": {
+          "AWS": "arn:aws:iam::176713589038:role/databricks-s3-prod-credential-role"
+        },
+        "Action": "sts:AssumeRole"
+      }
+    ]
+  }
